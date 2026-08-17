@@ -1,0 +1,7 @@
+Metadata for: yoga_instructor_humanoid
+==============================
+
+Body part indexes:
+[ 0]
+
+Total timesteps: 629

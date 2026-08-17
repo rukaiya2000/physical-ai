@@ -147,6 +147,9 @@ activemq-data/
 # SageMath parsed files
 *.sage.py
 
+# Downloaded MuJoCo Menagerie Unitree G1 meshes
+third_party/mujoco_menagerie/
+
 # Environments
 .env
 .envrc

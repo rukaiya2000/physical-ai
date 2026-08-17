@@ -1,0 +1,7 @@
+Motion Information: yoga_instructor_humanoid
+==================================================
+
+source_fps: 30
+target_fps: 50
+source_frames: 378
+target_frames: 629
