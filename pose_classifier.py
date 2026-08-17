@@ -17,8 +17,8 @@ from typing import Mapping, Sequence
 import numpy as np
 
 
-# Pose 1 and Pose 3 have similar limb angles, so face direction, hand points,
-# and landmark depth are useful classification cues too.
+# Correct and incorrect examples can share similar limb angles, so face
+# direction, hand points, and landmark depth are useful classification cues.
 POSE_LANDMARKS = np.arange(33)
 
 
@@ -155,10 +155,24 @@ def classifier_from_directory(reference_dir: Path, landmarker: object) -> PoseCl
 
     examples: dict[str, list[Sequence[object]]] = {}
     for image_path in image_paths:
-        # Pose1.jpg -> Pose1; Pose1_2.jpg -> Pose1 (a second example).
-        label = re.sub(r"_\d+$", "", image_path.stem)
+        label = reference_label(image_path)
         examples.setdefault(label, []).append(detect_landmarks(image_path, landmarker))
     return PoseClassifier(examples)
+
+
+def reference_label(image_path: Path) -> str:
+    """Return the class label encoded in a reference-image filename.
+
+    The current baseline filenames map to the three user-facing pose labels.
+    A double-underscore numeric suffix denotes an additional example of the
+    same class, e.g. ``incorrect_pose_1__2.jpg``.
+    """
+
+    label = re.sub(r"__\d+$", "", image_path.stem)
+    legacy_incorrect = re.fullmatch(r"incorrect_(\d+)", label)
+    if legacy_incorrect:
+        return f"incorrect_pose_{legacy_incorrect.group(1)}"
+    return label
 
 
 def _parse_args() -> argparse.Namespace:
