@@ -23,6 +23,7 @@ from mediapipe.tasks.python import vision
 
 from g1_sim.mapping import motion_for_pose
 from pose_classifier import classifier_from_directory
+from pose_rules import classify_by_angles, extract_joint_angles
 
 
 def _parse_args() -> argparse.Namespace:
@@ -100,15 +101,30 @@ def main() -> None:
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
             result = landmarker.detect(mp_image)
-            label = "no_person"
             if result.pose_landmarks:
-                prediction = classifier.predict(result.pose_landmarks[0])
-                label = prediction.label
-                window.append(label)
-                overlay = (
-                    f"{label} ({prediction.similarity:.0%}) → "
-                    f"{motion_for_pose(label)}"
-                )
+                landmarks = result.pose_landmarks[0]
+                # The angle rules decide: legs and arms are judged as separate
+                # groups (doc section 4).  The embedding classifier compares
+                # whole-body shape, which dilutes the single-joint differences
+                # between these classes, so it is shown only as a reference.
+                angles = extract_joint_angles(landmarks)
+                label = classify_by_angles(angles)
+                prediction = classifier.predict(landmarks)
+                if label is None:
+                    window.clear()
+                    overlay = (
+                        f"adjusting… knee {angles['left_knee']:.0f} "
+                        f"sh {angles['left_shoulder']:.0f}/"
+                        f"{angles['right_shoulder']:.0f} "
+                        f"(embed: {prediction.label})"
+                    )
+                else:
+                    window.append(label)
+                    overlay = (
+                        f"{label} → {motion_for_pose(label)} "
+                        f"(embed: {prediction.label} "
+                        f"{prediction.similarity:.0%})"
+                    )
             else:
                 window.clear()
                 overlay = "no person"
