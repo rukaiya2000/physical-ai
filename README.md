@@ -60,6 +60,11 @@ If the pose is in between (arms hanging, mid-bend), the system **does not guess*
 
 `correction_2` is the recorded clip in `sonic/yoga_instructor_humanoid/`. The other two names still use kinematic placeholders until those SONIC files exist.
 
+We handed this SONIC pipeline off to the physical G1's owners, who agreed to
+test it on the real robot and said they'd do their best — but we weren't able
+to get footage back before the deadline, so the live robot has not been
+validated end-to-end yet. Everything above has only been proven in MuJoCo.
+
 Coach videos that define the two paths (no audio in the live demo yet):
 
 - `pose_images/correction_incorrect_1.mov`
