@@ -67,7 +67,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _majority_label(window: deque[str]) -> str | None:
-    if not window:
+    if not window or len(window) < window.maxlen:
         return None
     label, count = Counter(window).most_common(1)[0]
     if count < len(window):
@@ -110,22 +110,12 @@ def main() -> None:
                 angles = extract_joint_angles(landmarks)
                 label = classify_by_angles(angles)
                 prediction = classifier.predict(landmarks)
-                if label is None:
-                    window.clear()
-                    overlay = (
-                        f"adjusting… sh "
-                        f"{angles['left_shoulder']:.0f}/"
-                        f"{angles['right_shoulder']:.0f} "
-                        f"knee {angles['left_knee']:.0f} "
-                        f"(embed: {prediction.label})"
-                    )
-                else:
-                    window.append(label)
-                    overlay = (
-                        f"{label} → {motion_for_pose(label)} "
-                        f"(embed: {prediction.label} "
-                        f"{prediction.similarity:.0%})"
-                    )
+                window.append(label)
+                overlay = (
+                    f"{label} → {motion_for_pose(label)} "
+                    f"(embed: {prediction.label} "
+                    f"{prediction.similarity:.0%})"
+                )
             else:
                 window.clear()
                 overlay = "no person"

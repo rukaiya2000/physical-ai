@@ -25,14 +25,20 @@ def serve_motions(bind: str = "tcp://127.0.0.1:5555", viewer: bool = True) -> No
     print(f"Send one of: {', '.join(MOTION_NAMES)}")
     try:
         while player.is_running():
-            events = dict(poller.poll(timeout=20))
+            events = dict(poller.poll(timeout=5))
+            finished = player.step()
             player.sync()
+            if finished is not None:
+                print(f"finished {finished.name}")
             if socket not in events:
                 continue
             name = socket.recv_string().strip()
             try:
-                clip = player.play(name)
-                reply = f"ok {clip.name} frames={clip.n_frames} source={clip.source}"
+                clip = player.start(name)
+                reply = (
+                    f"ok started {clip.name} frames={clip.n_frames} "
+                    f"source={clip.source}"
+                )
             except Exception as error:  # noqa: BLE001 - send the error to the client
                 reply = f"error {error}"
             socket.send_string(reply)

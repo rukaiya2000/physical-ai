@@ -10,19 +10,28 @@
 | `pose_images/correction_incorrect_2.mov` | Fix **incorrect 2** → correct |
 | `pose_images/correct_holding.mov` | Success state: hold the correct pose |
 
-**Stills (same shapes, used by `notebooks/mediapipe_smoketest.ipynb`):**
+**Stills (ground-truth classes used by `notebooks/mediapipe_smoketest.ipynb`):**
 
-| Notebook image | File | Shape |
-| --- | --- | --- |
-| `img1` / `angles_1` | `pose_images/correct_pose.jpg` | **Target** Warrior II |
-| `img2` / `angles_2` | `pose_images/incorrect_1.jpg` | Arms already out; **both knees straight** |
-| `img3` / `angles_3` | `pose_images/incorrect_2.jpg` | Front knee already bent; **arms not level** (front arm up, back arm down) |
+| Notebook image | File | Class label | Shape |
+| --- | --- | --- | --- |
+| `img1` / `angles_1` | `pose_images/correct_pose.jpg` | `correct_pose` | **Target** Warrior II |
+| `img2` / `angles_2` | `pose_images/incorrect_1.jpg` | `incorrect_pose_1` | Arms already out; **both knees straight** |
+| `img3` / `angles_3` | `pose_images/incorrect_2.jpg` | `incorrect_pose_2` | Front knee already bent; **arms not level** (front arm up, back arm down) |
 
 **Angles:** 2D `calculate_angle(a, b, c)` via `extract_joint_angles()`. Left / right are MediaPipe body sides. In this dataset the **front / bent leg is the left knee** (person’s left, camera-right).
 
 The coach must follow the **spoken video for that error**. Do not mix the two correction paths. Do not add extra steps.
 
----
+Angles below are measured in the image plane and rounded to 0.1 degrees.
+
+| Joint | Correct | Incorrect 1 | Incorrect 2 |
+| --- | ---: | ---: | ---: |
+| `left_elbow` | 172.2° | 169.6° | 178.6° |
+| `right_elbow` | 174.1° | 178.5° | 173.4° |
+| `left_knee` | 146.5° | 175.2° | 143.2° |
+| `right_knee` | 170.5° | 174.9° | 173.0° |
+| `left_shoulder` | 92.4° | 93.9° | 148.4° |
+| `right_shoulder` | 73.3° | 79.3° | 22.2° |
 
 ## 1. Target: correct pose / hold
 
@@ -150,7 +159,7 @@ Never run both arm and knee scripts at once.
 
 `calculate_angle(a, b, c)` is the 2D image-plane angle at vertex `b`.
 
-| Key | Landmarks `(a, b, c)` |
+| Key | MediaPipe landmarks `(a, b, c)` |
 | --- | --- |
 | `left_elbow` | 11 → **13** → 15 |
 | `right_elbow` | 12 → **14** → 16 |
@@ -161,9 +170,19 @@ Never run both arm and knee scripts at once.
 
 Elbow / knee **~180°** = straight. Shoulder **~90°** = arm at shoulder height. Shoulder **~150°** = arm raised. Shoulder **~20°** = arm dropped toward the hip.
 
----
+## 6. Dataset naming
 
-## 6. Yoga basics (alignment, not extra steps)
+`pose_classifier.py` derives labels from filenames:
+
+- `correct_pose.jpg` → `correct_pose`
+- `incorrect_1.jpg` → `incorrect_pose_1`
+- `incorrect_2.jpg` → `incorrect_pose_2`
+- `label__2.jpg`, `label__3.jpg`, ... → additional examples for `label`
+
+Add several people, camera positions, and small alignment variations to each
+class before treating similarity scores as robust outside this demo scene.
+
+## 7. Yoga basics (alignment, not extra steps)
 
 These do not add cues. They constrain a pass:
 
@@ -175,7 +194,7 @@ These do not add cues. They constrain a pass:
 
 ---
 
-## 7. Implementation notes
+## 8. Implementation notes
 
 - Reuse `get_xy`, `calculate_angle`, and `extract_joint_angles` from the smoketest notebook.
 - Classify against `angles_2` (incorrect 1) vs `angles_3` (incorrect 2) vs `angles_1` (correct).

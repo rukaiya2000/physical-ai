@@ -1,0 +1,20 @@
+camera: 0
+
+poses:
+  incorrect_pose_1:
+    motion: correction_1
+    motion_dir: /home/bryan/yoga_instrcutor_humaniod_2/wrong_feet
+    cue: Bend your front knee and keep it aligned over your ankle.
+    audio: /home/bryan/yoga_instrcutor_humaniod_2/wrong_feet.m4a
+
+  incorrect_pose_2:
+    motion: correction_2
+    motion_dir: /home/bryan/yoga_instrcutor_humaniod_2/wrong_hand_demo
+    cue: Bring both arms level with your shoulders.
+    audio: /home/bryan/yoga_instrcutor_humaniod_2/wrong_hand.m4a
+
+  correct_pose:
+    motion: correct_hold
+    motion_dir: /home/bryan/yoga_instrcutor_humaniod_2/correct_pose
+    cue: Great alignment. Hold the pose and keep breathing.
+    audio: /home/bryan/yoga_instrcutor_humaniod_2/correct_pose.m4a

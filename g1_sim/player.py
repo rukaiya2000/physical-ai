@@ -17,6 +17,9 @@ class G1Player:
     def __init__(self, *, viewer: bool = True):
         self.model, self.data = _load_sim()
         self._viewer = None
+        self._clip: MotionClip | None = None
+        self._frame_index = 0
+        self._next_frame_at = 0.0
         if viewer:
             self._viewer = _open_viewer(self.model, self.data)
 
@@ -32,13 +35,48 @@ class G1Player:
             self._viewer.close()
             self._viewer = None
 
+    @property
+    def playing(self) -> bool:
+        return self._clip is not None
+
+    def start(self, name: str) -> MotionClip:
+        """Start (or replace) a clip without blocking the caller."""
+
+        self._clip = load_motion(name)
+        self._frame_index = 0
+        self._next_frame_at = time.monotonic()
+        return self._clip
+
+    def step(self) -> MotionClip | None:
+        """Advance real-time playback when a frame is due.
+
+        Returns the clip once it has completed, otherwise ``None``.
+        """
+
+        if self._clip is None or time.monotonic() < self._next_frame_at:
+            return None
+        clip = self._clip
+        _apply_qpos(self.model, self.data, clip.qpos_frame(self._frame_index))
+        self._frame_index += 1
+        self._next_frame_at += 1.0 / clip.fps
+        if self._frame_index >= clip.n_frames:
+            self._clip = None
+            return clip
+        return None
+
     def play(self, name: str, *, realtime: bool = True) -> MotionClip:
-        clip = load_motion(name)
-        for _ in _advance(self.model, self.data, clip, None, []):
-            if not self.is_running():
-                break
+        if not realtime:
+            clip = load_motion(name)
+            for _ in _advance(self.model, self.data, clip, None, []):
+                if not self.is_running():
+                    break
+                self.sync()
+            return clip
+        clip = self.start(name)
+        while self.playing and self.is_running():
+            self.step()
             self.sync()
-            _sleep(clip, realtime)
+            time.sleep(0.001)
         return clip
 
 

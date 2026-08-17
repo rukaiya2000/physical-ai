@@ -13,9 +13,10 @@ Recorded clip formats
 - ``root_quat`` (optional): ``(T, 4)`` as ``w x y z``
 - ``fps`` (optional): scalar
 
-or a directory ``name/`` containing SONIC-deploy ``joint_pos.csv`` (header is
-the 29 joint names, one row per timestep). Optional ``body_pos.csv`` /
-``body_quat.csv`` for the floating base.
+or a directory ``name/`` containing SONIC-deploy ``joint_pos.csv`` (29 columns
+in IsaacLab order, one row per timestep). The loader converts those columns to
+MuJoCo order. Optional ``body_pos.csv`` / ``body_quat.csv`` provide the
+floating base.
 """
 
 from __future__ import annotations
@@ -27,7 +28,13 @@ from typing import Mapping
 
 import numpy as np
 
-from g1_sim.joints import JOINT_NAMES, STAND_JOINTS, STAND_ROOT_POS, STAND_ROOT_QUAT
+from g1_sim.joints import (
+    ISAACLAB_COLUMNS_IN_MUJOCO_ORDER,
+    JOINT_NAMES,
+    STAND_JOINTS,
+    STAND_ROOT_POS,
+    STAND_ROOT_QUAT,
+)
 from g1_sim.mapping import MOTION_NAMES
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -267,6 +274,10 @@ def _load_csv_dir(path: Path, name: str) -> MotionClip:
         raise ValueError(
             f"{path}: expected {len(JOINT_NAMES)} joint columns, got {joint_pos.shape[1]}"
         )
+    # GEAR-SONIC deployment CSVs are exported in IsaacLab order; the
+    # Menagerie model used by this player follows the MuJoCo kinematic order.
+    joint_pos = joint_pos[:, ISAACLAB_COLUMNS_IN_MUJOCO_ORDER]
+
     root_pos = None
     root_quat = None
     body_pos_path = path / "body_pos.csv"
@@ -322,3 +333,18 @@ def load_motion(name: str) -> MotionClip:
         DEFAULT_FPS,
         source="placeholder",
     )
+
+
+def load_motion_path(path: Path | str, *, name: str | None = None) -> MotionClip:
+    """Load a user-selected NPZ file or GEAR-SONIC CSV motion directory."""
+
+    source = Path(path).expanduser().resolve()
+    clip_name = name or source.stem
+    if source.is_dir():
+        joint_path = source / "joint_pos.csv"
+        if not joint_path.exists():
+            raise ValueError(f"Motion directory has no joint_pos.csv: {source}")
+        return _load_csv_dir(source, clip_name)
+    if source.suffix.lower() == ".npz":
+        return _load_npz(source, clip_name)
+    raise ValueError(f"Expected a motion directory or .npz file, got: {source}")

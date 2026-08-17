@@ -1,9 +1,10 @@
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
 
-from pose_classifier import PoseClassifier, pose_embedding
+from pose_classifier import PoseClassifier, pose_embedding, reference_label
 
 
 def make_landmarks(arm_y: float = 0.4, left_knee_x: float = 0.4):
@@ -37,6 +38,21 @@ def transformed(landmarks, scale: float, dx: float, dy: float):
 
 
 class PoseClassifierTests(unittest.TestCase):
+    def test_reference_images_encode_three_ground_truth_labels(self):
+        self.assertEqual(reference_label(Path("correct_pose.jpg")), "correct_pose")
+        self.assertEqual(
+            reference_label(Path("incorrect_1.jpg")), "incorrect_pose_1"
+        )
+        self.assertEqual(
+            reference_label(Path("incorrect_2.jpg")), "incorrect_pose_2"
+        )
+
+    def test_double_underscore_suffix_adds_an_example_to_a_class(self):
+        self.assertEqual(
+            reference_label(Path("incorrect_pose_1__2.jpg")),
+            "incorrect_pose_1",
+        )
+
     def test_embedding_is_translation_and_scale_invariant(self):
         original = make_landmarks()
         moved = transformed(original, scale=1.7, dx=-0.2, dy=0.1)

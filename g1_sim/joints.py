@@ -48,3 +48,13 @@ STAND_JOINTS: dict[str, float] = {
 }
 
 N_ROOT = 7  # freejoint: x y z qw qx qy qz
+
+# SONIC deployment CSV files store joints in IsaacLab order. Selecting these
+# columns produces the MuJoCo/JOINT_NAMES order above.
+ISAACLAB_COLUMNS_IN_MUJOCO_ORDER: tuple[int, ...] = (
+    0, 3, 6, 9, 13, 17,
+    1, 4, 7, 10, 14, 18,
+    2, 5, 8,
+    11, 15, 19, 21, 23, 25, 27,
+    12, 16, 20, 22, 24, 26, 28,
+)

@@ -29,6 +29,8 @@ class Prediction:
     label: str
     similarity: float
     similarities: dict[str, float]
+    distance: float
+    distances: dict[str, float]
 
 
 def _xy(landmarks: Sequence[object], index: int) -> np.ndarray:
@@ -126,9 +128,18 @@ class PoseClassifier:
         scores = {
             label: float(score) for label, score in zip(labels, similarities)
         }
+        distance_scores = {
+            label: float(distance) for label, distance in zip(labels, distances)
+        }
         best_index = int(np.argmin(distances))
         best_label = labels[best_index]
-        return Prediction(best_label, scores[best_label], scores)
+        return Prediction(
+            best_label,
+            scores[best_label],
+            scores,
+            distance_scores[best_label],
+            distance_scores,
+        )
 
 
 def detect_landmarks(image_path: Path, landmarker: object) -> Sequence[object]:
@@ -221,10 +232,7 @@ def main() -> None:
             embed = (
                 f"embed={prediction.label} {prediction.similarity:.0%}"
             )
-            if label is None:
-                print(f"{image_path}: no decision ({details}; {embed})")
-            else:
-                print(f"{image_path}: {label} ({details}; {embed})")
+            print(f"{image_path}: {label} ({details}; {embed})")
     finally:
         landmarker.close()
 

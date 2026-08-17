@@ -32,13 +32,13 @@ class PoseRulesTests(unittest.TestCase):
             with self.subTest(label=label):
                 self.assertEqual(classify_by_angles(angles), label)
 
-    def test_arms_down_with_bent_knee_is_no_decision(self):
+    def test_arms_down_with_bent_knee_forces_nearest_decision(self):
         angles = dict(
             MEASURED["correct_pose"], left_shoulder=40.2, right_shoulder=42.6
         )
-        self.assertIsNone(classify_by_angles(angles))
+        self.assertEqual(classify_by_angles(angles), "correct_pose")
 
-    def test_hands_on_hips_is_no_decision(self):
+    def test_hands_on_hips_forces_nearest_decision(self):
         angles = dict(
             MEASURED["incorrect_pose_1"],
             left_elbow=120.1,
@@ -46,11 +46,15 @@ class PoseRulesTests(unittest.TestCase):
             left_shoulder=40.2,
             right_shoulder=42.6,
         )
-        self.assertIsNone(classify_by_angles(angles))
+        self.assertEqual(classify_by_angles(angles), "incorrect_pose_1")
 
-    def test_half_bent_knee_with_level_arms_is_no_decision(self):
+    def test_half_bent_knee_with_level_arms_forces_nearest_decision(self):
         angles = dict(MEASURED["incorrect_pose_1"], left_knee=162.0)
-        self.assertIsNone(classify_by_angles(angles))
+        self.assertEqual(classify_by_angles(angles), "correct_pose")
+
+    def test_mixed_diagonal_arms_and_straight_knee_forces_incorrect_2(self):
+        angles = dict(MEASURED["incorrect_pose_2"], left_knee=175.0)
+        self.assertEqual(classify_by_angles(angles), "incorrect_pose_2")
 
     def test_one_joint_flips_correct_to_incorrect_1(self):
         angles = dict(MEASURED["correct_pose"], left_knee=175.0)

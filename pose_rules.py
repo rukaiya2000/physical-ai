@@ -38,6 +38,10 @@ FRONT_KNEE_BENT_MAX = 160.0
 FRONT_KNEE_STRAIGHT_MIN = 165.0
 # Only flip left/right when one knee is clearly more bent.
 FRONT_SIDE_MARGIN = 8.0
+# Scale rule violations so shoulder and knee errors contribute comparably to
+# the forced-decision fallback. These are distance scales, not pass bands.
+SHOULDER_DISTANCE_SCALE = 15.0
+KNEE_DISTANCE_SCALE = 5.0
 
 
 def calculate_angle(a, b, c) -> float:
@@ -92,6 +96,60 @@ def _front_knee_straight(angles: Mapping[str, float]) -> bool:
     return angles["left_knee"] > FRONT_KNEE_STRAIGHT_MIN
 
 
+def _distance_to_band(value: float, low: float, high: float) -> float:
+    """Distance from ``value`` to a closed interval (zero when inside)."""
+
+    if value < low:
+        return low - value
+    if value > high:
+        return value - high
+    return 0.0
+
+
+def _scaled_square(distance: float, scale: float) -> float:
+    return (distance / scale) ** 2
+
+
+def _fallback_rule_scores(angles: Mapping[str, float]) -> dict[str, float]:
+    """Return distance-to-rule scores; the smallest rule is the best fit."""
+
+    left_level = _distance_to_band(
+        angles["left_shoulder"], *LEFT_SHOULDER_LEVEL
+    )
+    right_level = _distance_to_band(
+        angles["right_shoulder"], *RIGHT_SHOULDER_LEVEL
+    )
+    level_score = _scaled_square(
+        left_level, SHOULDER_DISTANCE_SCALE
+    ) + _scaled_square(right_level, SHOULDER_DISTANCE_SCALE)
+
+    bent_distance = max(0.0, angles["left_knee"] - FRONT_KNEE_BENT_MAX)
+    straight_distance = max(
+        0.0, FRONT_KNEE_STRAIGHT_MIN - angles["left_knee"]
+    )
+    diagonal_left = max(
+        0.0, LEFT_SHOULDER_HIGH - angles["left_shoulder"]
+    )
+    diagonal_right = max(
+        0.0, angles["right_shoulder"] - RIGHT_SHOULDER_LOW
+    )
+    diagonal_knee = max(
+        0.0, angles["left_knee"] - FRONT_KNEE_STRAIGHT_MIN
+    )
+
+    return {
+        "correct_pose": level_score
+        + _scaled_square(bent_distance, KNEE_DISTANCE_SCALE),
+        "incorrect_pose_1": level_score
+        + _scaled_square(straight_distance, KNEE_DISTANCE_SCALE),
+        "incorrect_pose_2": (
+            _scaled_square(diagonal_left, SHOULDER_DISTANCE_SCALE)
+            + _scaled_square(diagonal_right, SHOULDER_DISTANCE_SCALE)
+            + _scaled_square(diagonal_knee, KNEE_DISTANCE_SCALE)
+        ),
+    }
+
+
 def _swap_sides(angles: Mapping[str, float]) -> dict[str, float]:
     """Rewrite angles as if the left leg were the front / bent leg."""
 
@@ -133,15 +191,20 @@ def _classify_left_front(angles: Mapping[str, float]) -> str | None:
     return None
 
 
-def classify_by_angles(angles: Mapping[str, float]) -> str | None:
+def classify_by_angles(angles: Mapping[str, float]) -> str:
     """Pick a path from shoulders first, then the front knee.
 
     The front leg is whichever knee is more bent, so left-facing and
     right-facing Warrior II use the same rules.
 
-    Returns ``None`` when the pose matches no row — mid-transition frames,
-    both arms hanging, mixed errors. Callers must treat ``None`` as
-    "no decision", never as a fourth class.
+    Exact rule matches keep their original priority. Mid-transition frames,
+    mixed errors, and poses outside every pass band are forced to the nearest
+    of the three rule regions, so a detected person always gets one label.
     """
 
-    return _classify_left_front(_with_front_leg_on_the_left(angles))
+    normalized = _with_front_leg_on_the_left(angles)
+    exact = _classify_left_front(normalized)
+    if exact is not None:
+        return exact
+    scores = _fallback_rule_scores(normalized)
+    return min(scores, key=scores.get)

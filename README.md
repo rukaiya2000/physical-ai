@@ -39,7 +39,7 @@ webcam
         ↓
 MediaPipe pose landmarks
         ↓
-angle rules  →  incorrect 1 | incorrect 2 | correct | (not sure yet)
+angle rules  →  incorrect 1 | incorrect 2 | correct
         ↓
 map to a named motion
         ↓
@@ -56,7 +56,9 @@ MuJoCo Unitree G1 demonstrates the correction
 | Lunge already there, **arms on a diagonal** | `correction_2` — level the arms *(real SONIC clip)* |
 | Front knee bent **and** arms in one line | `correct_hold` — stay |
 
-If the pose is in between (arms hanging, mid-bend), the system **does not guess**. The overlay says it is still adjusting; no motion starts.
+If the pose is between strict bands (arms hanging, mid-bend, or mixed errors),
+the system selects the nearest of those three rule regions. A detected person
+therefore always receives one decision.
 
 `correction_2` is the recorded clip in `sonic/yoga_instructor_humanoid/`. The other two names still use kinematic placeholders until those SONIC files exist.
 
@@ -102,10 +104,13 @@ flowchart TD
     rules -->|left high, right low, knee not straight| p2[incorrect_pose_2]
     rules -->|shoulders level, front knee bent| ok[correct_pose]
     rules -->|shoulders level, front knee straight| p1[incorrect_pose_1]
-    rules -->|anything else| wait[no decision]
+    rules -->|anything else| near[nearest rule fallback]
     p2 --> m2[play_motion correction_2]
     ok --> m0[play_motion correct_hold]
     p1 --> m1[play_motion correction_1]
+    near --> p2
+    near --> ok
+    near --> p1
     m2 --> g1[MuJoCo G1]
     m0 --> g1
     m1 --> g1
@@ -117,7 +122,9 @@ flowchart TD
 2. Treats **path B (incorrect 2)** as a diagonal arm line; the lunge can be slightly imperfect.
 3. Treats **path A (incorrect 1)** as level arms plus a straight front knee (`left_knee > 165°`).
 4. Treats **correct** as level arms plus a bent front knee (`left_knee ≤ 160°`).
-5. Never runs both correction scripts at once.
+5. Scores any pose outside those strict bands against all three rule regions
+   and chooses the nearest one.
+6. Never runs both correction scripts at once.
 
 Elbows are not part of the live decision: in these three shapes they are already straight.
 
@@ -202,3 +209,43 @@ If the camera is denied: quit Terminal with **Cmd+Q**, reopen it, and run Termin
 | `pose_images/` | Reference stills and teacher videos |
 | `notebooks/mediapipe_smoketest.ipynb` | Landmarks and angles |
 | `docs/warrior2_pose2_to_pose3_requirements.md` | Coaching spec |
+
+---
+
+## Integrated desktop coach
+
+`coach_app.py` combines a continuously running live pose detector, snapshot
+pose selection, an embedded MuJoCo render, and audio coaching cues in one large
+window. Live predictions are previews only. Press the snapshot button, hold
+the pose through the five-second countdown, and only the frame captured at
+zero triggers its matching demonstration and audio cue.
+
+One-time setup if the NVIDIA GEAR-SONIC checkout is not present under
+`robotics/GR00T-WholeBodyControl`:
+
+```bash
+source .venv/bin/activate
+python -m g1_sim.fetch_model
+```
+
+Launch the coach:
+
+```bash
+python coach_app.py
+```
+
+The default pose-to-motion/audio mapping is in `coach/actions.yaml`. Relative
+motion and audio paths are resolved from the repository root. The knee and
+shoulder decision bands are defined in `pose_rules.py`. Manual demonstration
+buttons remain available for testing without taking a snapshot.
+
+### If it does not fire
+
+- `No person`: step back until your full body is visible.
+- Camera error: close other apps using the camera and retry with
+  `python coach_app.py --camera 0` (or the correct device index).
+- Simulation error: confirm either the NVIDIA checkout exists at
+  `robotics/GR00T-WholeBodyControl` or fetch the Menagerie model with
+  `python -m g1_sim.fetch_model`.
+- No sound: select a working output device for PortAudio or use the mute
+  checkbox while testing motion playback.
