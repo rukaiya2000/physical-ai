@@ -76,6 +76,36 @@ class PoseRulesTests(unittest.TestCase):
         )
         self.assertEqual(classify_by_angles(angles), "incorrect_pose_2")
 
+    def test_mirrored_incorrect_2_still_incorrect_2(self):
+        # test_3: right arm high, right knee bent (other Warrior II side).
+        angles = {
+            "left_elbow": 178.0, "right_elbow": 178.0,
+            "left_knee": 169.0, "right_knee": 139.0,
+            "left_shoulder": 12.0, "right_shoulder": 149.0,
+        }
+        self.assertEqual(classify_by_angles(angles), "incorrect_pose_2")
+
+    def test_mirrored_level_arms_is_correct(self):
+        # test_5: right knee more bent, arms roughly out.
+        angles = {
+            "left_elbow": 175.0, "right_elbow": 175.0,
+            "left_knee": 167.0, "right_knee": 143.0,
+            "left_shoulder": 65.0, "right_shoulder": 93.0,
+        }
+        self.assertEqual(classify_by_angles(angles), "correct_pose")
+
+    def test_swapped_reference_incorrect_2(self):
+        original = MEASURED["incorrect_pose_2"]
+        mirrored = {
+            "left_elbow": original["right_elbow"],
+            "right_elbow": original["left_elbow"],
+            "left_knee": original["right_knee"],
+            "right_knee": original["left_knee"],
+            "left_shoulder": original["right_shoulder"],
+            "right_shoulder": original["left_shoulder"],
+        }
+        self.assertEqual(classify_by_angles(mirrored), "incorrect_pose_2")
+
 
 if __name__ == "__main__":
     unittest.main()

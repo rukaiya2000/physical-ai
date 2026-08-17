@@ -4,6 +4,9 @@ Correct vs incorrect 2 is a **shoulder** split (level arms vs a diagonal).
 Incorrect 1 is a **knee** split (front knee straight vs bent). Elbows are
 not used: both error poses already have straight arms.
 
+Left vs right does not matter: the more bent knee is treated as the front
+leg, then the same bands apply.
+
 Measured 2D angles match ``extract_joint_angles()`` in the smoketest notebook
 and the bands in ``docs/warrior2_pose2_to_pose3_requirements.md``.
 """
@@ -33,6 +36,8 @@ RIGHT_SHOULDER_LOW = 55.0
 # Front (left) knee: bent vs straight. Gap 160–165 is "still moving".
 FRONT_KNEE_BENT_MAX = 160.0
 FRONT_KNEE_STRAIGHT_MIN = 165.0
+# Only flip left/right when one knee is clearly more bent.
+FRONT_SIDE_MARGIN = 8.0
 
 
 def calculate_angle(a, b, c) -> float:
@@ -87,14 +92,31 @@ def _front_knee_straight(angles: Mapping[str, float]) -> bool:
     return angles["left_knee"] > FRONT_KNEE_STRAIGHT_MIN
 
 
-def classify_by_angles(angles: Mapping[str, float]) -> str | None:
-    """Pick a path from shoulders first, then the front knee.
+def _swap_sides(angles: Mapping[str, float]) -> dict[str, float]:
+    """Rewrite angles as if the left leg were the front / bent leg."""
 
-    Returns ``None`` when the pose matches no row — mid-transition frames,
-    both arms hanging, mixed errors. Callers must treat ``None`` as
-    "no decision", never as a fourth class.
-    """
+    swapped = dict(angles)
+    for left_name, right_name in (
+        ("left_shoulder", "right_shoulder"),
+        ("left_knee", "right_knee"),
+        ("left_elbow", "right_elbow"),
+    ):
+        swapped[left_name], swapped[right_name] = (
+            angles[right_name],
+            angles[left_name],
+        )
+    return swapped
 
+
+def _with_front_leg_on_the_left(angles: Mapping[str, float]) -> Mapping[str, float]:
+    """Use the more bent knee as the front leg (either Warrior II side)."""
+
+    if angles["left_knee"] - angles["right_knee"] > FRONT_SIDE_MARGIN:
+        return _swap_sides(angles)
+    return angles
+
+
+def _classify_left_front(angles: Mapping[str, float]) -> str | None:
     diagonal = _arms_diagonal(angles)
     level = _arms_level(angles)
     bent = _front_knee_bent(angles)
@@ -109,3 +131,17 @@ def classify_by_angles(angles: Mapping[str, float]) -> str | None:
     if level and straight:
         return "incorrect_pose_1"
     return None
+
+
+def classify_by_angles(angles: Mapping[str, float]) -> str | None:
+    """Pick a path from shoulders first, then the front knee.
+
+    The front leg is whichever knee is more bent, so left-facing and
+    right-facing Warrior II use the same rules.
+
+    Returns ``None`` when the pose matches no row — mid-transition frames,
+    both arms hanging, mixed errors. Callers must treat ``None`` as
+    "no decision", never as a fourth class.
+    """
+
+    return _classify_left_front(_with_front_leg_on_the_left(angles))
