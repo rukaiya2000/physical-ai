@@ -1,8 +1,8 @@
-"""The rule classifier must reproduce the doc's decision table exactly."""
+"""The rule classifier must use shoulders for path B and knees for path A."""
 
 from __future__ import annotations
 
-import pytest
+import unittest
 
 from pose_rules import classify_by_angles
 
@@ -26,34 +26,56 @@ MEASURED = {
 }
 
 
-@pytest.mark.parametrize("label", sorted(MEASURED))
-def test_reference_poses_classify_to_their_own_label(label):
-    assert classify_by_angles(MEASURED[label]) == label
+class PoseRulesTests(unittest.TestCase):
+    def test_reference_poses_classify_to_their_own_label(self):
+        for label, angles in MEASURED.items():
+            with self.subTest(label=label):
+                self.assertEqual(classify_by_angles(angles), label)
+
+    def test_arms_down_with_bent_knee_is_no_decision(self):
+        angles = dict(
+            MEASURED["correct_pose"], left_shoulder=40.2, right_shoulder=42.6
+        )
+        self.assertIsNone(classify_by_angles(angles))
+
+    def test_hands_on_hips_is_no_decision(self):
+        angles = dict(
+            MEASURED["incorrect_pose_1"],
+            left_elbow=120.1,
+            right_elbow=116.3,
+            left_shoulder=40.2,
+            right_shoulder=42.6,
+        )
+        self.assertIsNone(classify_by_angles(angles))
+
+    def test_half_bent_knee_with_level_arms_is_no_decision(self):
+        angles = dict(MEASURED["incorrect_pose_1"], left_knee=162.0)
+        self.assertIsNone(classify_by_angles(angles))
+
+    def test_one_joint_flips_correct_to_incorrect_1(self):
+        angles = dict(MEASURED["correct_pose"], left_knee=175.0)
+        self.assertEqual(classify_by_angles(angles), "incorrect_pose_1")
+
+    def test_only_shoulders_flip_correct_to_incorrect_2(self):
+        angles = dict(
+            MEASURED["correct_pose"],
+            left_shoulder=148.4,
+            right_shoulder=22.2,
+        )
+        self.assertEqual(classify_by_angles(angles), "incorrect_pose_2")
+
+    def test_bent_elbows_do_not_block_correct_if_shoulders_are_level(self):
+        angles = dict(
+            MEASURED["correct_pose"], left_elbow=150.0, right_elbow=148.0
+        )
+        self.assertEqual(classify_by_angles(angles), "correct_pose")
+
+    def test_knee_slightly_outside_lunge_band_still_incorrect_2(self):
+        angles = dict(
+            MEASURED["incorrect_pose_2"], left_knee=162.0, right_knee=160.0
+        )
+        self.assertEqual(classify_by_angles(angles), "incorrect_pose_2")
 
 
-def test_arms_down_with_bent_knee_is_no_decision():
-    # Warrior II stance but arms hanging (both shoulders ~40): must not be
-    # mistaken for incorrect_pose_2, whose signature is one arm HIGH.
-    angles = dict(MEASURED["correct_pose"], left_shoulder=40.2, right_shoulder=42.6)
-    assert classify_by_angles(angles) is None
-
-
-def test_bent_elbows_are_no_decision():
-    # pose2 of the old flow: hands on hips, knees straight, elbows bent.
-    angles = dict(
-        MEASURED["incorrect_pose_1"],
-        left_elbow=120.1, right_elbow=116.3,
-        left_shoulder=40.2, right_shoulder=42.6,
-    )
-    assert classify_by_angles(angles) is None
-
-
-def test_half_bent_knee_is_no_decision():
-    # Mid-correction on path A: knee between the bands (160-165).
-    angles = dict(MEASURED["incorrect_pose_1"], left_knee=162.0)
-    assert classify_by_angles(angles) is None
-
-
-def test_one_joint_flips_correct_to_incorrect_1():
-    angles = dict(MEASURED["correct_pose"], left_knee=175.0)
-    assert classify_by_angles(angles) == "incorrect_pose_1"
+if __name__ == "__main__":
+    unittest.main()

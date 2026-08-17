@@ -199,19 +199,32 @@ def main() -> None:
 
     from mediapipe.tasks.python import vision
 
+    from pose_rules import classify_by_angles, extract_joint_angles
+
     landmarker = vision.PoseLandmarker.create_from_model_path(str(args.model))
     try:
         classifier = classifier_from_directory(args.references, landmarker)
         for image_path in args.images:
-            prediction = classifier.predict(detect_landmarks(image_path, landmarker))
+            landmarks = detect_landmarks(image_path, landmarker)
+            angles = extract_joint_angles(landmarks)
+            label = classify_by_angles(angles)
+            prediction = classifier.predict(landmarks)
             details = ", ".join(
-                f"{label}={score:.1%}"
-                for label, score in sorted(prediction.similarities.items())
+                f"{name}={angles[name]:.0f}°"
+                for name in (
+                    "left_shoulder",
+                    "right_shoulder",
+                    "left_knee",
+                    "right_knee",
+                )
             )
-            print(
-                f"{image_path}: {prediction.label} "
-                f"(similarity {prediction.similarity:.1%}; {details})"
+            embed = (
+                f"embed={prediction.label} {prediction.similarity:.0%}"
             )
+            if label is None:
+                print(f"{image_path}: no decision ({details}; {embed})")
+            else:
+                print(f"{image_path}: {label} ({details}; {embed})")
     finally:
         landmarker.close()
 

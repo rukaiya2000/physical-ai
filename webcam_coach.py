@@ -113,9 +113,10 @@ def main() -> None:
                 if label is None:
                     window.clear()
                     overlay = (
-                        f"adjusting… knee {angles['left_knee']:.0f} "
-                        f"sh {angles['left_shoulder']:.0f}/"
+                        f"adjusting… sh "
+                        f"{angles['left_shoulder']:.0f}/"
                         f"{angles['right_shoulder']:.0f} "
+                        f"knee {angles['left_knee']:.0f} "
                         f"(embed: {prediction.label})"
                     )
                 else:

@@ -1,15 +1,11 @@
 """Rule-based Warrior II classification from joint angles.
 
-The embedding classifier in ``pose_classifier.py`` measures one global
-body-shape distance, where ~92% of the weight sits on raw landmark positions.
-Correct and incorrect_1 differ by a single knee angle, so on any person or
-camera other than the reference photos that difference drowns in positional
-noise.  This module instead applies the decision table from
-``docs/warrior2_pose2_to_pose3_requirements.md`` section 4: the leg group and
-the arm group are judged separately, against the documented pass bands.
+Correct vs incorrect 2 is a **shoulder** split (level arms vs a diagonal).
+Incorrect 1 is a **knee** split (front knee straight vs bent). Elbows are
+not used: both error poses already have straight arms.
 
-Angles are the same 2D image-plane measurements as ``extract_joint_angles()``
-in ``notebooks/mediapipe_smoketest.ipynb``.
+Measured 2D angles match ``extract_joint_angles()`` in the smoketest notebook
+and the bands in ``docs/warrior2_pose2_to_pose3_requirements.md``.
 """
 
 from __future__ import annotations
@@ -27,6 +23,16 @@ ANGLE_TRIPLETS = {
     "left_shoulder": (13, 11, 23),
     "right_shoulder": (14, 12, 24),
 }
+
+# Shoulders: one horizontal line at shoulder height (correct / incorrect 1).
+LEFT_SHOULDER_LEVEL = (85.0, 115.0)
+RIGHT_SHOULDER_LEVEL = (55.0, 95.0)
+# Incorrect 2: front arm high, back arm low.
+LEFT_SHOULDER_HIGH = 115.0
+RIGHT_SHOULDER_LOW = 55.0
+# Front (left) knee: bent vs straight. Gap 160–165 is "still moving".
+FRONT_KNEE_BENT_MAX = 160.0
+FRONT_KNEE_STRAIGHT_MIN = 165.0
 
 
 def calculate_angle(a, b, c) -> float:
@@ -54,39 +60,52 @@ def extract_joint_angles(landmarks: Sequence[object]) -> dict[str, float]:
 
 
 def _arms_level(angles: Mapping[str, float]) -> bool:
-    """Both arms straight and in one horizontal line (doc section 1 bands)."""
+    """Both arms in one horizontal line. Elbows are ignored."""
 
+    left_lo, left_hi = LEFT_SHOULDER_LEVEL
+    right_lo, right_hi = RIGHT_SHOULDER_LEVEL
     return (
-        angles["left_elbow"] >= 160
-        and angles["right_elbow"] >= 160
-        and 85 <= angles["left_shoulder"] <= 115
-        and 55 <= angles["right_shoulder"] <= 95
+        left_lo <= angles["left_shoulder"] <= left_hi
+        and right_lo <= angles["right_shoulder"] <= right_hi
     )
 
 
-def _legs_in_lunge(angles: Mapping[str, float]) -> bool:
-    """Front (left) knee bent into the pass band, back leg long."""
+def _arms_diagonal(angles: Mapping[str, float]) -> bool:
+    """Incorrect 2: front/left arm raised, back/right arm dropped."""
 
-    return 135 <= angles["left_knee"] <= 160 and angles["right_knee"] >= 165
+    return (
+        angles["left_shoulder"] > LEFT_SHOULDER_HIGH
+        and angles["right_shoulder"] < RIGHT_SHOULDER_LOW
+    )
+
+
+def _front_knee_bent(angles: Mapping[str, float]) -> bool:
+    return angles["left_knee"] <= FRONT_KNEE_BENT_MAX
+
+
+def _front_knee_straight(angles: Mapping[str, float]) -> bool:
+    return angles["left_knee"] > FRONT_KNEE_STRAIGHT_MIN
 
 
 def classify_by_angles(angles: Mapping[str, float]) -> str | None:
-    """Doc section 4: pick a path from the leg and arm groups separately.
+    """Pick a path from shoulders first, then the front knee.
 
     Returns ``None`` when the pose matches no row — mid-transition frames,
-    arms hanging down, etc.  Callers must treat ``None`` as "no decision",
-    never as a fourth class.
+    both arms hanging, mixed errors. Callers must treat ``None`` as
+    "no decision", never as a fourth class.
     """
 
-    arms = _arms_level(angles)
-    legs = _legs_in_lunge(angles)
+    diagonal = _arms_diagonal(angles)
+    level = _arms_level(angles)
+    bent = _front_knee_bent(angles)
+    straight = _front_knee_straight(angles)
 
-    if legs and arms:
-        return "correct_pose"
-    # Arms already in place but both knees straight.
-    if arms and angles["left_knee"] > 165 and angles["right_knee"] >= 165:
-        return "incorrect_pose_1"
-    # Lunge already there but the arms are a diagonal: front high, back low.
-    if legs and angles["left_shoulder"] > 115 and angles["right_shoulder"] < 55:
+    # Path B: lunge can be imperfect; the tell is the shoulder diagonal.
+    if diagonal and not straight:
         return "incorrect_pose_2"
+    if level and bent:
+        return "correct_pose"
+    # Path A: arms already level, front knee still straight.
+    if level and straight:
+        return "incorrect_pose_1"
     return None
